@@ -57,6 +57,7 @@ if [ -d "source/release/dist" ]; then
     chflags -R noschg source/release/dist
     rm -Rf source/release/dist
 fi
+rm -Rf source/release/*.txz
 
 export BASEDIR=$(pwd)
 export MAKEOBJDIRPREFIX=`pwd`/bld
