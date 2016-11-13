@@ -1,0 +1,217 @@
+Intro
+=====
+
+These scripts are used for appliance building, targeting the Raspberry Pi
+Model B/B+ and Raspberry Pi 2 Model B single board computers. They are
+intended to be used with Jenkins or other auto build system but may be used
+stand-alone. The build host should be running FreeBSD 11 or greater.
+
+The image build process is split into stages. The stages may be thought of in
+terms of a shell pipeline. The output of one stage is fed to the input of
+another.
+
+System Prep
+===========
+
+There are a few dependencies. These scripts require that the 'u-boot-rpi',
+'u-boot-rpi2', and 'qemu-user-static' packages be installed on the host
+system. These are easily installed using the 'pkg install' command.
+
+    pkg install u-boot-rpi u-boot-rpi2 qemu-user-static.
+
+The qemu static binary activator must be enabled. This may be accomplished by
+adding this to '/etc/rc.conf' on the build host and rebooting:
+
+    qemu_user_static_enable="YES"
+
+It's also handy to have 'git'. It makes maintaining a custom FreeBSD branch
+easy. Pulling in upstream changes becomes as trivial as:
+
+    git remote update
+    git merge upstream/stable/11
+
+The "upstream" may be the FreeBSD "base" mirror on github.
+
+Build It
+========
+
+As a quick introduction, the build stages are demonstrated from an interactive
+line by line walk through. This goes from nothing to a basic image that may be
+written to a SD card and booted on a RPI model B/B+. The resultant image has
+no additional user accounts, no network configuration, and must be accessed
+via serial console. 
+
+0   [user@system ~]$ sudo /bin/sh
+1   # export xtarget=rpi
+2   # mkdir fbsd-demo
+3   # cd fbsd-demo/
+4   # mkdir source
+5   # mount_nullfs /path/to/freebsd-base source
+6   # rpi-image-firmware.sh > build.log 2>&1
+7   # rpi-image-compile.sh >> build.log 2>&1
+8   # rpi-image-prepare.sh >> build.log 2>&1
+9   # rpi-image-create.sh >> build.log 2>&1
+10  # xzcat imgroot.img.xz | dd of=/dev/da0 bs=1M
+
+Line 0
+------
+Become root. Creating the distribution archives, initializing filesystems, and
+working with memory disks require it.
+
+Line 1
+------
+The "xtarget" environment variable may be set to "rpi" or "rpi2" which will
+select the appropriate TARGET, TARGET_ARCH, & KERNCONF for the Raspberry Pi 1
+or 2 respectively. "rpi2" is used if unset. The specific kernel configuration
+files selected are "RPI-B" or "RPI2".
+
+Line 2-5
+--------
+Create a directory to hold the project files. This also sets up the FreeBSD
+source to be available in "source" subdirectory. The source can be acquired by
+any means. The example nullfs mounts it from somewhere else, but it could just
+as easily be created via "svn co ..." or "git clone ..."
+
+Line 6
+------
+Create an archive file called "firmware.txz". This contains the contents of
+either the u-boot-rpi or u-boot-rpi2 ports. This archive is used during the
+later "image prepare" stage.
+
+Line 7
+------
+Compile the base FreeBSD system present in the "source" directory and build
+the distribution archives. The object files are created in a subdirectory
+called "bld" relative to the current working directory. This step will use all
+available CPUs during the compilation stage but can still take a while. When
+it finishes the "kern.txz" and "base.txz" archives (and a few others) will be
+in the current working directory.
+
+Line 8
+------
+Extract the firmware and distribution archives into a working directory called
+"imgroot". If a package list is specified then they are installed into the
+image root by means of chroot, a helper script, and qemu-arm-static. Packages
+are downloaded from the FreeBSD package mirror network. Finally, if a
+"rpi-config.sh" script exists in the current directory, it is copied into the
+chroot and executed.
+
+Note:
+    This first example does not define a package list or image configure
+    script. More on that later...
+
+Line 9
+------
+Create a 1GB sized file on disk, attach it to the memory disk driver,
+partition with msdosfs and ufs boot | root partitions, copy the image root,
+and clean up. The raw disk image is compressed with xz. This step can take
+several minutes so hang in there and resist the temptation of pressing ^C. The
+compressed image (imgroot.img.xz) may be written directly to a SD card (after
+decompression) and booted.
+
+An experimental 'boot only' SD card image is also created. It contains just
+the 24MB msdos partition and the boot code. The "imgroot.img.xz" image may be
+written directly to an external USB stick or hard drive. The system boots off
+of the SD card and loader loads the kernel and mounts the root filesystem off
+of the USB device. At the time of writing this mode of operation is fairly
+unreliable. ~50% of the time the system gets stuck in u-boot trying to
+re-enumerate USB devices after a soft reboot.
+
+Line 10
+-------
+Write the compressed image out to an SD card and boot it up. Be careful to
+pick the correct target disk device. Console output should look as follows:
+
+    U-Boot 2016.01 (Nov 03 2016 - 23:55:30 +0000)
+
+    DRAM:  480 MiB
+    RPI Model B rev2 (0xe)
+
+    ... much console output snipped here ...
+
+    Starting cron.
+    Starting background file system checks in 60 seconds.
+
+    Sat Nov 12 15:59:19 UTC 2016
+
+    FreeBSD/arm (Amnesiac) (ttyu0)
+
+    login:
+
+SD cards are kind of crappy and can't take much write heavy abuse. So, the
+default fstab puts a few things on a tmpfs. The image configure script is free
+to write out a custom fstab if this is not desirable.
+
+    root@:~ # mount
+    /dev/ufs/uroot on / (ufs, local, noatime, journaled soft-updates, nfsv4acls)
+    devfs on /dev (devfs, local)
+    /dev/msdosfs/UBOOT on /boot/msdos (msdosfs, local, noatime)
+    tmpfs on /tmp (tmpfs, local)
+    tmpfs on /var/tmp (tmpfs, local)
+    tmpfs on /var/log (tmpfs, local)
+
+
+Image Customization
+===================
+A stock FreeBSD build with no configuration is not very useful. Lets expand on
+the previous example by building an appliance containing a webserver and is
+reachable via ssh with a new user account.
+
+Create a file called "rpi-image.packages" that lists packages to install, one
+per line. This example installs a single package, "lighttpd". Next create a
+script called "rpi-config.sh" that is called in the chroot during the image
+prepare stage. Finally, create a directory called "root" that contains any
+additional files or directories to overlay onto the image root. This overlay
+adds an init script that makes sure the lighttpd log directory exists and also
+includes a default "hello world" style index page.
+
+    rpi-image.packages:
+        lighttpd
+
+
+    rpi-config.sh:
+        #!/bin/sh
+        cat >> /etc/rc.conf << EOF
+        hostname="freebsd"
+        powerd_enable="YES"
+        sshd_enable="YES"
+        sendmail_enable="NO"
+        ifconfig_ue0="DHCP"
+        ntpd_enable="YES"
+        ntpd_sync_on_start="YES"
+        lighttpd_enable="YES"
+        lighttpd_logdir_enable="YES"
+        EOF
+
+        echo '172.0.0.1 freebsd freebsd.my.domain' >> /etc/hosts
+        mkdir -p /usr/local/www/data
+        chmod a+x /usr/local/etc/rc.d/lighttpd_logdir
+        pw useradd -m -n freebsd
+        pw group mod wheel -m freebsd
+        pw group mod operator -m freebsd
+        echo "freebsd" | pw mod user freebsd -h 0
+
+
+    root overlay:
+        root
+        root/usr
+        root/usr/local
+        root/usr/local/etc
+        root/usr/local/etc/rc.d
+        root/usr/local/etc/rc.d/lighttpd_logdir
+        root/usr/local/www
+        root/usr/local/www/data
+        root/usr/local/www/data/index.html
+    
+The new image is constructed and deployed by rerunning the prepare & create
+scripts and writing out the new image. The firmware.txz, base.txz, and
+kernel.txz archives must exist in the current directory.
+
+    # rpi-image-prepare.sh >> build.log 2>&1
+    # rpi-image-create.sh >> build.log 2>&1
+    # xzcat imgroot.img.xz | dd of=/dev/da0 bs=1M
+
+Jenkins Integration
+===================
+
+... write me ...

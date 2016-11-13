@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+ 
+# PROVIDE: lighttpd_logdir
+# REQUIRE: DAEMON
+# BEFORE: lighttpd
+ 
+. /etc/rc.subr
+
+name="lighttpd_logdir"
+rcvar=lighttpd_logdir_enable
+ 
+: ${lighttpd_logdir_enable="NO"}
+ 
+start_cmd="setup_lighttpd_logdir"
+stop_cmd=":"
+
+setup_lighttpd_logdir()
+{
+	mkdir -p /var/log/lighttpd
+	touch /var/log/lighttpd/error.log
+	touch /var/log/lighttpd/access.log
+	chown -R www /var/log/lighttpd
+}
+
+load_rc_config $name
+run_rc_command "$1"
+
