@@ -24,17 +24,21 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# These scripts are written for FreeBSD and assume a PREFIX of "/usr/local".
-# DESTDIR is for package staging support.
-DESTDIR?= /usr/local
+PREFIX?= /usr/local
+bindir= $(DESTDIR)$(PREFIX)/bin
+docdir= $(DESTDIR)$(PREFIX)/share/doc/rpi-image-tools
 
-$(DESTDIR)/bin:
-	mkdir -p $(DESTDIR)/bin
+all :
+	@echo "Hello, how are you today?"
 
-install :  $(DESTDIR)/bin
-	install -m 555 rpi-image-compile.sh          $(DESTDIR)/bin/
-	install -m 555 rpi-image-create.sh           $(DESTDIR)/bin/
-	install -m 555 rpi-image-firmware.sh         $(DESTDIR)/bin/
-	install -m 555 rpi-image-prepare.sh          $(DESTDIR)/bin/
-	install -m 444 rpi-image-install-packages.sh $(DESTDIR)/bin/
+$(bindir) $(docdir):
+	mkdir -p $@
+
+install : $(bindir) $(docdir)
+	install -m 555 rpi-image-compile.sh          $(bindir)
+	install -m 555 rpi-image-create.sh           $(bindir)
+	install -m 555 rpi-image-firmware.sh         $(bindir)
+	install -m 555 rpi-image-prepare.sh          $(bindir)
+	install -m 444 rpi-image-install-packages.sh $(bindir)
+	install -m 444 README                        $(docdir)
 
