@@ -97,6 +97,16 @@ cp $QEMU_STATIC ${IMG_ROOT}/usr/local/bin
 mount -t devfs none ${IMG_ROOT}/dev
 cp /etc/resolv.conf ${IMG_ROOT}/etc/
 
+# Run user supplied init.sh script here! This is intended for doing early
+# configuration tasks such as setting up any non-default or private package
+# repositories.
+if [ -e "rpi-init.sh" ] ; then
+    cp rpi-init.sh ${IMG_ROOT}
+    chmod a+x ${IMG_ROOT}/rpi-init.sh
+    chroot ${IMG_ROOT} ./rpi-init.sh
+    rm ${IMG_ROOT}/rpi-init.sh
+fi
+
 if [ -e "rpi-image.packages" ] ; then
     # This allows the rpi-image tools to run out of source checkout
     # directory or be installed system wide.
