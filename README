@@ -91,13 +91,13 @@ Line 8
 ------
 Extract the firmware and distribution archives into a working directory called
 "imgroot". If a "rpi-init.sh" scripts exists in the current directory, it is
-copied into the chroot and executed prior package installation. If a package
-list is specified, then those packages are installed into the image root by
-means of chroot, pkg, and qemu-arm-static. By default, packages are downloaded
-from the FreeBSD package mirror network. An alternate package repository may
-be configured via the "rpi-init.sh" script. Finally, if a "rpi-config.sh"
-script exists in the current directory, it is copied into the chroot and
-executed after packages have been installed.
+copied into the chroot and executed prior to package installation. If a
+package list is specified, then those packages are installed into the image
+root by means of chroot, pkg, and qemu-arm-static. By default, packages are
+downloaded from the FreeBSD package mirror network. An alternate package
+repository may be configured via the "rpi-init.sh" script. Finally, if a
+"rpi-config.sh" script exists in the current directory, it is copied into the
+chroot and executed after packages have been installed.
 
 Line 9
 ------
